@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "MotoRec",
+    "slug": "motorec",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#000000",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.motorec.app",
+      "requireFullScreen": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "A MotoRec a kamerát videófelvételhez használja.",
+        "NSMicrophoneUsageDescription": "A MotoRec a mikrofont a videó hangjának rögzítéséhez használja.",
+        "NSPhotoLibraryAddUsageDescription": "A MotoRec a kész videókat a Fotókba menti.",
+        "NSMotionUsageDescription": "A MotoRec a mozgásszenzorokat a dőlésszög méréséhez használja.",
+        "UIRequiresFullScreen": true,
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "plugins": [
+      "expo-asset",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "A MotoRec a GPS-t a sebesség méréséhez használja."
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "A MotoRec a mozgásszenzorokat a dőlésszög méréséhez használja."
+        }
+      ]
+    ]
+  }
+}

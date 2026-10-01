@@ -1,0 +1,77 @@
+name: iOS build (aláíratlan IPA)
+
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: "Release = önálló app | Debug = fejlesztői build (a gépeden futó szerverhez csatlakozik)"
+        type: choice
+        options:
+          - Release
+          - Debug
+        default: Release
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 75
+    env:
+      CONFIG: ${{ inputs.configuration }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Függőségek telepítése
+        run: npm ci
+
+      - name: Natív iOS projekt generálása
+        run: npx expo prebuild -p ios --clean --no-install
+
+      - name: CocoaPods
+        run: cd ios && pod install
+
+      - name: Fordítás (aláírás nélkül)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -workspace ios/MotoRec.xcworkspace \
+            -scheme MotoRec \
+            -configuration "$CONFIG" \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            2>&1 | tee build.log | grep -E "error:|warning: .*OverlayRenderer|BUILD (SUCCEEDED|FAILED)" || true
+          test -d "build/Build/Products/${CONFIG}-iphoneos/MotoRec.app"
+
+      - name: IPA csomagolása
+        run: |
+          mkdir -p Payload
+          cp -R "build/Build/Products/${CONFIG}-iphoneos/MotoRec.app" Payload/
+          zip -qry "MotoRec-${CONFIG}.ipa" Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MotoRec-${{ inputs.configuration }}-ipa
+          path: MotoRec-*.ipa
+          retention-days: 14
+
+      - name: Hibák kigyűjtése
+        if: failure()
+        run: |
+          grep -n "error:" build.log | head -80 > errors.txt || true
+          cat errors.txt
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: build-log
+          path: |
+            build.log
+            errors.txt
