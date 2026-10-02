@@ -57,6 +57,16 @@ export function useSpeed() {
     error: null,
   })
   const speedRef = useRef(0) // m/s
+  /**
+   * Folyamatos (interpolált) sebesség: a GPS kb. 1 mp-enként ad új értéket,
+   * a kijelzés a két érték között egyenletesen halad, így nem ugrál.
+   */
+  const interp = useRef({ from: 0, to: 0, t0: 0, dur: 1, lastFix: 0 })
+  const speedNow = useRef((nowMs: number = Date.now()): number => {
+    const i = interp.current
+    const k = Math.min(1, Math.max(0, (nowMs - i.t0) / (i.dur * 1000)))
+    return i.from + (i.to - i.from) * k
+  }).current
   const lastPos = useRef<{ lat: number; lon: number; t: number } | null>(null)
 
   useEffect(() => {
@@ -101,7 +111,18 @@ export function useSpeed() {
           // enyhe simítás, hogy ne ugráljon a kijelzés
           const smoothed = speedRef.current * 0.3 + ms * 0.7
           speedRef.current = smoothed < 0.6 ? 0 : smoothed // ~2 km/h alatt 0
-          lastUpdate = Date.now()
+          const now = Date.now()
+          const i = interp.current
+          const gap = i.lastFix > 0 ? (now - i.lastFix) / 1000 : 1
+          interp.current = {
+            from: speedNow(now),
+            to: speedRef.current,
+            t0: now,
+            // a következő értékig tartó idő becslése (0,3–1,5 mp)
+            dur: Math.min(1.5, Math.max(0.3, gap)),
+            lastFix: now,
+          }
+          lastUpdate = now
           setState({
             kmh: speedRef.current * 3.6,
             accuracy: accuracy ?? null,
@@ -128,5 +149,6 @@ export function useSpeed() {
     }
   }, [])
 
-  return { speed: state, speedRef }
+  /** speedNow(): folyamatos sebesség m/s-ban (a kijelzéshez és a videóhoz) */
+  return { speed: state, speedRef, speedNow }
 }

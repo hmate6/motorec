@@ -1,21 +1,30 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { DeviceMotion } from 'expo-sensors'
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { GForceEstimator, type GValues } from './gforce'
 import { LeanEstimator } from './lean'
 
 const CAL_KEY = 'motorec.calibration.v1'
 
 /**
- * Mozgásszenzor feliratkozás + dőlésszög becslés.
+ * Mozgásszenzor feliratkozás + dőlésszög és G-erő becslés.
  * A becslés 60 Hz-en fut, a kijelzés ~15 Hz-en frissül.
  */
-export function useLean(speedRef: RefObject<number>, invert: boolean) {
+export function useLean(
+  speedRef: RefObject<number>,
+  invert: boolean,
+  invertLong = false,
+) {
   const estimator = useRef(new LeanEstimator())
   const angleRef = useRef(0) // + = balra (invert után)
   const [angle, setAngle] = useState(0)
   const [available, setAvailable] = useState<boolean | null>(null)
   const invertRef = useRef(invert)
   invertRef.current = invert
+  const gEstimator = useRef(new GForceEstimator())
+  gEstimator.current.invertLong = invertLong
+  const gRef = useRef<GValues>({ long: 0, lat: 0, total: 0 })
+  const [g, setG] = useState<GValues>({ long: 0, lat: 0, total: 0 })
 
   useEffect(() => {
     let sub: { remove: () => void } | null = null
@@ -54,8 +63,17 @@ export function useLean(speedRef: RefObject<number>, invert: boolean) {
           speedRef.current ?? 0,
         )
         angleRef.current = invertRef.current ? -raw : raw
+        gRef.current = gEstimator.current.update(
+          a,
+          estimator.current.debug.yawRate,
+          speedRef.current ?? 0,
+          t,
+        )
       })
-      uiTimer = setInterval(() => setAngle(angleRef.current), 66)
+      uiTimer = setInterval(() => {
+        setAngle(angleRef.current)
+        setG(gRef.current)
+      }, 33)
     })()
 
     return () => {
@@ -72,5 +90,5 @@ export function useLean(speedRef: RefObject<number>, invert: boolean) {
     return ok
   }, [])
 
-  return { angle, angleRef, calibrate, available, estimator }
+  return { angle, angleRef, g, gRef, calibrate, available, estimator }
 }

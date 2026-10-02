@@ -1,4 +1,3 @@
-import { Asset } from 'expo-asset'
 import { useKeepAwake } from 'expo-keep-awake'
 import { StatusBar } from 'expo-status-bar'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -15,20 +14,22 @@ import {
 import {
   Camera,
   CommonResolutions,
+  useCameraDevices,
   useCameraPermission,
   useMicrophonePermission,
   useVideoOutput,
   type CameraSessionConfig,
+  type CameraDevice,
   type Constraint,
   type Recorder,
 } from 'react-native-vision-camera'
 import OverlayRenderer from './modules/overlay-renderer'
-import { OVERLAY_LAYOUT } from './src/layout'
-import { LOGO, Overlay } from './src/Overlay'
-import { useSettings, type Resolution, type Settings } from './src/settings'
+import { Overlay } from './src/Overlay'
+import { useSettings, type Lens, type Resolution, type Settings } from './src/settings'
 import { SettingsModal } from './src/SettingsModal'
 import { displayedSpeed, useSpeed } from './src/speed'
 import { useLean } from './src/useLean'
+import { useLogo } from './src/useLogo'
 
 const RESOLUTIONS: Record<Resolution, { width: number; height: number }> = {
   '720p': CommonResolutions.HD_16_9,
@@ -47,16 +48,18 @@ function formatTime(sec: number) {
 
 export default function App() {
   useKeepAwake()
-  const { settings, update } = useSettings()
+  const { settings, update, updateOverlay, updateElement, updateEffects } =
+    useSettings()
   const settingsRef = useRef<Settings>(settings)
   settingsRef.current = settings
 
   const camPerm = useCameraPermission()
   const micPerm = useMicrophonePermission()
-  const { speed, speedRef } = useSpeed()
-  const { angle, angleRef, calibrate, estimator } = useLean(
+  const { speed, speedRef, speedNow } = useSpeed()
+  const { angle, angleRef, g, gRef, calibrate, estimator } = useLean(
     speedRef,
     settings.invertLean,
+    settings.invertLong,
   )
 
   // --- A videókép (16:9) területe a képernyőn ---
@@ -65,6 +68,24 @@ export default function App() {
   const videoH = (videoW * 9) / 16
   const videoX = (SW - videoW) / 2
   const videoY = (SH - videoH) / 2
+
+  // --- Kamera (lencse) ---
+  const allDevices = useCameraDevices()
+  const lensDevices = useMemo(() => {
+    const map: Partial<Record<Lens, CameraDevice>> = {}
+    for (const d of allDevices) {
+      if (d.position !== 'back' || d.isVirtualDevice) continue
+      if (d.type === 'ultra-wide-angle') map['ultra-wide'] ??= d
+      else if (d.type === 'wide-angle') map.wide ??= d
+      else if (d.type === 'telephoto') map.tele ??= d
+    }
+    return map
+  }, [allDevices])
+  const availableLenses = useMemo(
+    () => (Object.keys(lensDevices) as Lens[]),
+    [lensDevices],
+  )
+  const cameraDevice = lensDevices[settings.lens] ?? lensDevices.wide
 
   // --- Kamera ---
   const videoOutput = useVideoOutput({
@@ -97,21 +118,17 @@ export default function App() {
   const logRows = useRef<string[]>([])
   const t0 = useRef(0)
   const sampleTimer = useRef<ReturnType<typeof setInterval> | null>(null)
-  const logoPath = useRef<string | null>(null)
+  const updateLogo = useCallback(
+    (patch: Parameters<typeof updateElement<'logo'>>[1]) => updateElement('logo', patch),
+    [updateElement],
+  )
+  const logo = useLogo(settings.overlay.logo, updateLogo)
+  const getLogoPath = useRef(logo.getLogoPath)
+  getLogoPath.current = logo.getLogoPath
 
   const showToast = useCallback((msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 2200)
-  }, [])
-
-  // A logó fájl útvonala a natív renderelőnek
-  useEffect(() => {
-    Asset.fromModule(LOGO)
-      .downloadAsync()
-      .then((a) => {
-        logoPath.current = a.localUri ?? a.uri
-      })
-      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -122,20 +139,27 @@ export default function App() {
   }, [])
 
   // --- Kijelzett értékek ---
+  // folyamatos (interpolált) sebesség – a felület 30x/mp frissül a dőlés miatt
   const shownSpeed = displayedSpeed(
-    speed.kmh,
+    speedNow() * 3.6,
     settings.speedCorrection,
     settings.speedThreshold,
     settings.speedFactor,
   )
   const leanLeft = Math.max(0, angle)
   const leanRight = Math.max(0, -angle)
+  const gShown = g[settings.overlay.gforce.gMode]
+
+  // Legnagyobb dőlés (felvételenként nullázódik)
+  const maxLean = useRef({ l: 0, r: 0 })
+  if (leanLeft > maxLean.current.l) maxLean.current.l = leanLeft
+  if (leanRight > maxLean.current.r) maxLean.current.r = leanRight
 
   // --- Telemetria rögzítés ---
   const takeSample = useCallback(() => {
     const t = (Date.now() - t0.current) / 1000
     const s = settingsRef.current
-    const kmh = (speedRef.current ?? 0) * 3.6
+    const kmh = speedNow() * 3.6
     const shown = displayedSpeed(
       kmh,
       s.speedCorrection,
@@ -145,7 +169,13 @@ export default function App() {
     const a = angleRef.current
     const l = Math.max(0, a)
     const r = Math.max(0, -a)
-    samples.current.push(t, Math.round(shown), Math.round(l), Math.round(r))
+    const gv = gRef.current
+    const gm = s.overlay.gforce.gMode
+    // [t, kijelzett sebesség, G-erő, bal dőlés, jobb dőlés] – tizedes pontossággal,
+    // a videón a mintavételek között folyamatosan átmenetel
+    const r1 = (v: number) => Math.round(v * 10) / 10
+    const r2 = (v: number) => Math.round(v * 100) / 100
+    samples.current.push(t, r1(shown), r2(gv[gm]), r1(l), r1(r))
     const d = estimator.current.debug
     logRows.current.push(
       [
@@ -158,10 +188,13 @@ export default function App() {
         d.modelAngle.toFixed(2),
         d.yawRate.toFixed(2),
         d.weight.toFixed(2),
+        gv.long.toFixed(3),
+        gv.lat.toFixed(3),
+        gv.total.toFixed(3),
       ].join(','),
     )
     setElapsed(t)
-  }, [speedRef, angleRef, estimator])
+  }, [speedNow, angleRef, gRef, estimator])
 
   const finishRecording = useCallback(
     async (filePath: string) => {
@@ -180,7 +213,7 @@ export default function App() {
         // napló (hibakereséshez)
         const stamp = new Date().toISOString().replace(/[:.]/g, '-')
         const csv =
-          't,speed_kmh,shown_kmh,lean_deg,gyro_z,gravity_angle,model_angle,yaw_rate,model_weight\n' +
+          't,speed_kmh,shown_kmh,lean_deg,gyro_z,gravity_angle,model_angle,yaw_rate,model_weight,g_long,g_lat,g_total\n' +
           rows.join('\n')
         const logUri = await OverlayRenderer.writeTextFile(
           `motorec-${stamp}.csv`,
@@ -193,10 +226,9 @@ export default function App() {
           setProgress(0)
           const out = await OverlayRenderer.renderOverlay({
             inputPath: filePath,
-            logoPath: logoPath.current ?? '',
-            label: s.label,
+            logoPath: getLogoPath.current(),
+            overlayJson: JSON.stringify({ ...s.overlay, effects: s.effects }),
             samples: data,
-            ...OVERLAY_LAYOUT,
           })
           setProcessing('UI-s videó mentése…')
           await OverlayRenderer.saveVideoToPhotos(out)
@@ -219,6 +251,7 @@ export default function App() {
       const rec = await videoOutput.createRecorder({})
       recorderRef.current = rec
       samples.current = []
+      maxLean.current = { l: 0, r: 0 }
       logRows.current = []
       await rec.startRecording(
         (filePath) => {
@@ -305,7 +338,7 @@ export default function App() {
       <StatusBar hidden />
       <Camera
         style={StyleSheet.absoluteFill}
-        device="back"
+        device={cameraDevice ?? 'back'}
         isActive={!busy}
         outputs={[videoOutput]}
         constraints={constraints}
@@ -330,8 +363,12 @@ export default function App() {
         <Overlay
           width={videoW}
           height={videoH}
-          label={settings.label}
-          speed={shownSpeed}
+          config={settings.overlay}
+          logoSource={logo.logoSource}
+          speedKmh={shownSpeed}
+          g={gShown}
+          maxLeft={maxLean.current.l}
+          maxRight={maxLean.current.r}
           leanLeft={leanLeft}
           leanRight={leanRight}
         />
@@ -403,12 +440,20 @@ export default function App() {
 
       <SettingsModal
         visible={settingsOpen}
-        settings={settings}
-        onChange={update}
         onClose={() => setSettingsOpen(false)}
+        settings={settings}
+        update={update}
+        updateOverlay={updateOverlay}
+        updateElement={updateElement}
+        updateEffects={updateEffects}
+        logoSource={logo.logoSource}
+        hasCustomLogo={logo.hasCustom}
+        onPickLogo={logo.pick}
+        onResetLogo={logo.reset}
+        availableLenses={availableLenses}
+        activeFormat={activeFormat}
         onShareLog={onShareLog}
         hasLog={lastLog != null}
-        activeFormat={activeFormat}
       />
     </View>
   )

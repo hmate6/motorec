@@ -1,5 +1,3 @@
-brave
-
 # MotoRec – telepítés és használat
 
 Motoros videófelvevő iPhone-ra: GPS-sebesség, dőlésszög, és minden felvétel
@@ -79,8 +77,20 @@ Ha a Sideloadly azt írja, hogy a Bundle ID foglalt: Sideloadly → *Advanced op
   1. elmenti a nyers videót a Fotókba,
   2. elkészíti és elmenti a UI-s példányt (ez **időbe telik**: kb. a videó hosszának
      fele–egésze 1080p-ben, 4K-ban több; közben a telefon melegszik).
-- **Fogaskerék (beállítások):** felbontás (720p/1080p/4K), 30/60 fps, a logó alatti
-  szöveg, sebesség-korrekció (küszöb és szorzó), UI-s videó be/ki, bal/jobb csere.
+- **Fogaskerék (beállítások):** bal oldalt élő előnézet, jobb oldalt fülek:
+  - **Videó:** lencse (0.5× ultraszéles / 1× normál / tele – ami a telefonon van),
+    felbontás (720p/1080p/4K), 30/60 fps, UI-s videó be/ki.
+  - **Mérés:** sebesség-korrekció (küszöb, szorzó), bal/jobb csere, napló megosztása.
+  - **Kinézet:** betűtípus (Oswald / rendszer), margó, betűvastagság, árnyék, háttér a feliratok mögött, teljes visszaállítás.
+  - **Dőlés:** bal alsó műszer – félköríves mutató a dőlés irányába, alatta
+    `bal | jobb` érték, a felvétel legnagyobb dőlésének jelzése az íven, és
+    színváltás (alapból piros) egy szög felett (alapból 30°). Méret, hely, szín állítható.
+  - **Sebesség / G:** jobb fent kicsi, halvány sebesség, alatta a G-erő
+    (összes / gyorsítás-fékezés / kanyar). Mértékegység nélkül, de bekapcsolható.
+    A valós sebességhez a „Mérés” fülön kapcsold ki a korrekciót.
+  - **Logó:** alapból kikapcsolva; saját kép a Fotókból, pozíció, méret, felirat.
+  - **Effektek:** sebességfüggő elmosás a széleken, dinamikus ráközelítés,
+    vignetta, élénk színek. Csak a UI-s videón jelennek meg, és lassítják a feldolgozást.
 - **Sebesség-korrekció:** folytonos: a küszöb alatt a valós érték, felette
   `küszöb + (sebesség − küszöb) × szorzó`. Alapból 60 és 0,8 (pl. 70 → 68, 100 → 92).
 - A képernyő nem alszik el, amíg az app nyitva van. **Ne zárd le a telefont
@@ -98,7 +108,26 @@ Ha a Sideloadly azt írja, hogy a Bundle ID foglalt: Sideloadly → *Advanced op
 - A GPS kb. másodpercenként frissül és kicsit késik; a sebesség és a modellből
   számolt dőlés ezért kb. 1 másodpercet késhet.
 
-## 7. Gyorsabb fejlesztés (opcionális, később)
+## 7. UI előnézet a böngészőben (Windowson, telefon nélkül)
+
+A felület kinézetét a gépeden is ki tudod próbálni, fordítás nélkül:
+
+1. Telepítsd a Node.js-t (nodejs.org, LTS verzió).
+2. A projekt mappájában egyszer: `npm install`
+3. Indítás: `npx expo start --web` – megnyílik a böngészőben.
+   A „Menet szimulálása” gombbal kanyarokat játszik le, így a mozgás is látszik.
+
+Itt látod a UI-t (logó, sebesség/G, dőlések), a minta értékeket gombokkal
+állíthatod, és a teljes beállítások képernyő is kipróbálható. Ha az
+`src/Overlay.tsx`-et vagy az `src/overlayConfig.ts`-t módosítod és elmented,
+a böngésző azonnal frissül.
+
+Korlátok: kamera, GPS, szenzorok és effektek itt nincsenek; a betűtípus
+Windowson más, mint iPhone-on. A videóra égetett változatot a Swift kód rajzolja
+(`modules/overlay-renderer/ios/OverlayRendererModule.swift`) – ha ott is
+változtatsz kinézetet, azt csak a telefonon látod.
+
+## 8. Gyorsabb fejlesztés (opcionális, később)
 
 A `Debug` változatot fordítva és feltéve az app a gépeden futó fejlesztői
 szerverhez csatlakozik, így a JavaScript-módosítások (pl. dőlés-hangolás)
@@ -112,8 +141,12 @@ szerverhez csatlakozik, így a JavaScript-módosítások (pl. dőlés-hangolás)
 | `App.tsx` | Kamera, felvétel, gombok, mentés |
 | `src/lean.ts` | Dőlésszög becslés (szenzorfúzió) |
 | `src/speed.ts` | GPS sebesség és a korrekciós képlet |
-| `src/Overlay.tsx`, `src/layout.ts` | A képernyős UI és az elrendezés arányai |
-| `src/SettingsModal.tsx` | Beállítások |
-| `modules/overlay-renderer/ios/OverlayRendererModule.swift` | Natív rész: UI ráégetése a videóra, mentés a Fotókba |
+| `src/Overlay.tsx`, `src/overlayConfig.ts` | A képernyős UI és a testreszabás alapértékei |
+| `src/SettingsModal.tsx`, `src/ui.tsx` | Beállítások képernyő |
+| `src/useLogo.ts` | Saját logó kiválasztása |
+| `src/gforce.ts` | G-erő becslés |
+| `App.web.tsx` | Böngészős UI előnézet (csak fejlesztéshez) |
+| `assets/fonts/` | Oswald Tab betű (az Oswald egyforma széles számjegyekkel, OFL licenc) |
+| `modules/overlay-renderer/ios/OverlayRendererModule.swift` | Natív rész: UI és effektek ráégetése a videóra, mentés a Fotókba |
 | `assets/moto-icon.svg` / `.png` | A motoros ikon (cserélhető, PNG 3:2 arányban) |
 | `.github/workflows/ios-build.yml` | A felhős fordítás |

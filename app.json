@@ -17,7 +17,8 @@
         "NSPhotoLibraryAddUsageDescription": "A MotoRec a kész videókat a Fotókba menti.",
         "NSMotionUsageDescription": "A MotoRec a mozgásszenzorokat a dőlésszög méréséhez használja.",
         "UIRequiresFullScreen": true,
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "A MotoRec a saját logó kiválasztásához fér hozzá a fotóidhoz."
       }
     },
     "plugins": [
@@ -32,6 +33,24 @@
         "expo-sensors",
         {
           "motionPermission": "A MotoRec a mozgásszenzorokat a dőlésszög méréséhez használja."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "A MotoRec a saját logó kiválasztásához fér hozzá a fotóidhoz.",
+          "cameraPermission": "A MotoRec a kamerát videófelvételhez használja.",
+          "microphonePermission": "A MotoRec a mikrofont a videó hangjának rögzítéséhez használja."
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/OswaldTab-Medium.ttf",
+            "./assets/fonts/OswaldTab-SemiBold.ttf",
+            "./assets/fonts/OswaldTab-Bold.ttf"
+          ]
         }
       ]
     ]
