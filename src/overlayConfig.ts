@@ -58,6 +58,12 @@ export interface ValueElement {
 export interface SpeedElement extends ValueElement {
   /** A sebesség + G-erő csoport helye */
   anchor: Anchor
+  /**
+   * A csoport távolsága a kép szélétől, a kép magasságának %-ában.
+   * A számjegyek tetejétől mérve – így a kép tetejéből egy keskeny sávot
+   * levágva a sebesség eltűnik, az alatta lévő G-erő viszont megmarad.
+   */
+  edge: number
 }
 
 export interface GForceElement extends ValueElement {
@@ -134,6 +140,7 @@ export const DEFAULT_OVERLAY: OverlayConfig = {
   speed: {
     visible: true,
     anchor: 'tr',
+    edge: 1.2,
     size: 4.5,
     opacity: 55,
     color: '#FFFFFF',
@@ -331,3 +338,41 @@ export function arcPoint(g: GaugeGeometry, a: number, radius = g.r) {
 
 /** A számsor sormagassága a betűmérethez képest */
 export const GAUGE_LINE = 1.5
+
+/**
+ * Betű-metrikák a betűméret arányában (a sebesség/G csoport pontos
+ * elhelyezéséhez): ascent = a sor tetejétől az alapvonalig, digitTop = a
+ * számjegyek magassága az alapvonal felett. Oswald: a fontfájlból mérve.
+ * A Swift oldal ugyanezt a digitTop-ot használja (az ascent-et a betűből veszi).
+ */
+export const FONT_METRICS: Record<FontChoice, { ascent: number; digitTop: number }> = {
+  oswald: { ascent: 1.193, digitTop: 0.822 },
+  system: { ascent: 0.952, digitTop: 0.72 },
+}
+
+/**
+ * Rés a sebesség alapvonala és a G-erő számjegyeinek teteje között, a
+ * sebesség betűméretének arányában. Ebbe a résbe eshet a vágás vonala.
+ */
+export const VALUE_GAP = 0.5
+
+/**
+ * Mekkora sávot kell levágni a kép tetejéből (a kép magasságának %-ában),
+ * hogy a sebesség eltűnjön, de a G-erő megmaradjon. Az árnyék miatt kis
+ * ráhagyással. `maxPct`: ennél lejjebb már a G-erő kezdődik.
+ */
+export function speedCropPct(c: OverlayConfig): { cropPct: number; maxPct: number } {
+  const sp = c.speed
+  const top = FONT_METRICS[c.font].digitTop
+  const below = Math.max(
+    c.bgEnabled ? sp.size * BG_PAD_V : 0,
+    c.shadow > 0 ? sp.size * SHADOW_RADIUS : 0,
+  )
+  const above = Math.max(
+    c.bgEnabled ? c.gforce.size * BG_PAD_V : 0,
+    c.shadow > 0 ? c.gforce.size * SHADOW_RADIUS : 0,
+  )
+  const speedBottom = sp.edge + sp.size * top
+  const gTop = speedBottom + sp.size * VALUE_GAP
+  return { cropPct: speedBottom + below, maxPct: gTop - above }
+}

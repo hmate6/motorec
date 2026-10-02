@@ -13,6 +13,7 @@ import { Overlay } from './Overlay'
 import {
   DEFAULT_EFFECTS,
   DEFAULT_OVERLAY,
+  speedCropPct,
   type EffectsConfig,
   type FontChoice,
   type GForceElement,
@@ -544,6 +545,7 @@ function SpeedTab(p: Props) {
   const gf = p.settings.overlay.gforce
   const setSp = (patch: Partial<SpeedElement>) => p.updateElement('speed', patch)
   const setG = (patch: Partial<GForceElement>) => p.updateElement('gforce', patch)
+  const crop = speedCropPct(p.settings.overlay)
   return (
     <>
       <Hint>
@@ -552,6 +554,23 @@ function SpeedTab(p: Props) {
         sebességet mutatja.
       </Hint>
       <AnchorPicker value={sp.anchor} onChange={(v) => setSp({ anchor: v })} />
+      <Stepper
+        label="Távolság a kép szélétől"
+        value={sp.edge}
+        onChange={(v) => setSp({ edge: v })}
+        min={0}
+        max={20}
+        step={0.1}
+        suffix="%"
+        hint="A számjegyek tetejétől mérve, a kép magasságának százalékában."
+      />
+      {sp.anchor[0] === 't' && sp.visible && gf.visible ? (
+        <Hint>
+          {`A sebesség eltávolításához vágj le ${crop.cropPct.toFixed(1)}%-ot a videó tetejéből (1080p: ${Math.ceil(
+            (crop.cropPct / 100) * 1080,
+          )} px, 4K: ${Math.ceil((crop.cropPct / 100) * 2160)} px). A G-erő ${crop.maxPct.toFixed(1)}%-nál kezdődik, addig vághatsz.`}
+        </Hint>
+      ) : null}
 
       <Section title="Sebesség" />
       <Toggle label="Sebesség megjelenítése" value={sp.visible} onChange={(v) => setSp({ visible: v })} />

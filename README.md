@@ -85,9 +85,11 @@ Ha a Sideloadly azt írja, hogy a Bundle ID foglalt: Sideloadly → *Advanced op
   - **Dőlés:** bal alsó műszer – félköríves mutató a dőlés irányába, alatta
     `bal | jobb` érték, a felvétel legnagyobb dőlésének jelzése az íven, és
     színváltás (alapból piros) egy szög felett (alapból 30°). Méret, hely, szín állítható.
-  - **Sebesség / G:** jobb fent kicsi, halvány sebesség, alatta a G-erő
-    (összes / gyorsítás-fékezés / kanyar). Mértékegység nélkül, de bekapcsolható.
-    A valós sebességhez a „Mérés” fülön kapcsold ki a korrekciót.
+  - **Sebesség / G:** jobb fent, a kép szélénél kicsi, halvány sebesség, alatta
+    a G-erő (összes / gyorsítás-fékezés / kanyar). Mértékegység nélkül, de
+    bekapcsolható. A valós sebességhez a „Mérés” fülön kapcsold ki a korrekciót.
+    Ha a sebességet el akarod tüntetni a videóról, vágj le egy keskeny sávot a
+    tetejéből (a beállítások kiírják, mennyit – alapból kb. 5%); a G-erő megmarad.
   - **Logó:** alapból kikapcsolva; saját kép a Fotókból, pozíció, méret, felirat.
   - **Effektek:** sebességfüggő elmosás a széleken, dinamikus ráközelítés,
     vignetta, élénk színek. Csak a UI-s videón jelennek meg, és lassítják a feldolgozást.

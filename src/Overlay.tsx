@@ -14,6 +14,7 @@ import {
   BG_PAD_H,
   BG_PAD_V,
   BG_RADIUS,
+  FONT_METRICS,
   fontStyle,
   formatG,
   gaugeGeometry,
@@ -21,6 +22,7 @@ import {
   logoDims,
   rgba,
   SHADOW_RADIUS,
+  VALUE_GAP,
   type Anchor,
   type GaugeGeometry,
   type OverlayConfig,
@@ -46,10 +48,10 @@ interface Props {
 }
 
 /** Abszolút pozíció a kiválasztott sarokhoz / középhez */
-function anchorStyle(anchor: Anchor, m: number): ViewStyle {
+function anchorStyle(anchor: Anchor, m: number, vm: number = m): ViewStyle {
   const s: ViewStyle = { position: 'absolute' }
-  if (anchor[0] === 't') s.top = m
-  else s.bottom = m
+  if (anchor[0] === 't') s.top = vm
+  else s.bottom = vm
   if (anchor[1] === 'l') {
     s.left = m
     s.alignItems = 'flex-start'
@@ -62,6 +64,10 @@ function anchorStyle(anchor: Anchor, m: number): ViewStyle {
     s.alignItems = 'center'
   }
   return s
+}
+
+function anchorAlign(anchor: Anchor): ViewStyle['alignItems'] {
+  return anchor[1] === 'l' ? 'flex-start' : anchor[1] === 'r' ? 'flex-end' : 'center'
 }
 
 /** Ív a felső félkörön `from`-tól `to`-ig (fok a függőlegestől, + = jobbra) */
@@ -118,26 +124,58 @@ export function Overlay({
   const dims = logoDims(logo, W, H)
   const labelFont = dims.labelHeight * LABEL_FONT
 
-  // --- Sebesség + G (egymás alatt) ---
+  // --- Sebesség + alatta G ---
+  // A sorok a számjegyek tetejéhez/alapvonalához igazodnak (nem a szövegdobozhoz),
+  // így a csoport a kép széléhez nagyon közel tehető, és a sebesség egy
+  // keskeny sávval levágható úgy, hogy a G-erő megmaradjon.
   const sp = c.speed
   const gf = c.gforce
+  const metrics = FONT_METRICS[c.font]
+  const fS = (sp.size / 100) * H
+  const fG = (gf.size / 100) * H
+  const edge = (sp.edge / 100) * H
   const valueLine = (
     key: string,
     text: string,
-    e: { size: number; opacity: number; color: string; unitVisible: boolean; unitText: string },
-  ) => {
-    const f = (e.size / 100) * H
-    return (
-      <View key={key} style={[bg(f), { opacity: e.opacity / 100 }]}>
-        <Text style={[styles.number, shadow(f), font, { fontSize: f, color: e.color }]}>
-          {text}
-          {e.unitVisible && e.unitText.length > 0 ? (
-            <Text style={{ fontSize: f * 0.45 }}>{' ' + e.unitText}</Text>
-          ) : null}
-        </Text>
-      </View>
-    )
-  }
+    f: number,
+    e: { opacity: number; color: string; unitVisible: boolean; unitText: string },
+    marginTop: number,
+  ) => (
+    // a doboz magassága = a számjegyek magassága; az alja = az alapvonal.
+    // A háttér (ha be van kapcsolva) kilóg a dobozból, de nem tolja el.
+    <View
+      key={key}
+      style={[
+        { height: f * metrics.digitTop, opacity: e.opacity / 100, marginTop },
+        c.bgEnabled
+          ? {
+              height: f * metrics.digitTop + 2 * f * BG_PAD_V,
+              backgroundColor: rgba(c.bgColor, c.bgOpacity),
+              paddingHorizontal: f * BG_PAD_H,
+              paddingVertical: f * BG_PAD_V,
+              marginHorizontal: -f * BG_PAD_H,
+              marginTop: marginTop - f * BG_PAD_V,
+              marginBottom: -f * BG_PAD_V,
+              borderRadius: f * BG_RADIUS,
+            }
+          : null,
+      ]}
+    >
+      <Text
+        style={[
+          styles.number,
+          shadow(f),
+          font,
+          { fontSize: f, color: e.color, marginTop: -(metrics.ascent - metrics.digitTop) * f },
+        ]}
+      >
+        {text}
+        {e.unitVisible && e.unitText.length > 0 ? (
+          <Text style={{ fontSize: f * 0.45 }}>{' ' + e.unitText}</Text>
+        ) : null}
+      </Text>
+    </View>
+  )
 
   // --- Dőlés ---
   const ln = c.lean
@@ -190,9 +228,11 @@ export function Overlay({
       ) : null}
 
       {sp.visible || gf.visible ? (
-        <View style={anchorStyle(sp.anchor, m)}>
-          {sp.visible ? valueLine('speed', String(Math.round(speedKmh)), sp) : null}
-          {gf.visible ? valueLine('g', formatG(g), gf) : null}
+        <View style={anchorStyle(sp.anchor, m, edge)}>
+          <View style={{ alignItems: anchorAlign(sp.anchor) }}>
+            {sp.visible ? valueLine('speed', String(Math.round(speedKmh)), fS, sp, 0) : null}
+            {gf.visible ? valueLine('g', formatG(g), fG, gf, sp.visible ? fS * VALUE_GAP : 0) : null}
+          </View>
         </View>
       ) : null}
 

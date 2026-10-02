@@ -40,6 +40,8 @@ struct SpeedCfg: Decodable, ValueCfg {
   let visible: Bool
   /// A sebesség + G csoport helye
   let anchor: String
+  /// Távolság a kép szélétől (H %), a számjegyek tetejétől mérve
+  let edge: Double
   let size: Double
   let opacity: Double
   let color: String
@@ -112,6 +114,7 @@ private let BG_PAD_V: CGFloat = 0.08
 private let BG_RADIUS: CGFloat = 0.18
 private let LABEL_FONT: CGFloat = 0.72
 private let GAUGE_LINE: CGFloat = 1.5
+private let VALUE_GAP: CGFloat = 0.5
 
 // MARK: - Segédfüggvények
 
@@ -293,10 +296,6 @@ private final class OverlayPainter {
   private var gCache: [Int: CIImage] = [:]
   private var leanCache: [String: CIImage] = [:]
   private var logoImage: CIImage?
-  /// A sebesség és a G sor magassága (a háttérrel együtt) – az egymás alá
-  /// helyezéshez. Értéktől független, ezért egyszer számoljuk ki.
-  private var speedLineH: CGFloat = 0
-  private var gLineH: CGFloat = 0
   private var geo: Geo!
 
   init(width: CGFloat, height: CGFloat, cfg: OverlayCfg, logoPath: String) {
@@ -306,8 +305,6 @@ private final class OverlayPainter {
     self.logoPath = logoPath
     geo = OverlayPainter.makeGeo(cfg, height)
     if cfg.logo.visible { logoImage = makeLogo() }
-    speedLineH = cfg.speed.visible ? valueBlockSize("0", cfg.speed.size, cfg.speed).height : 0
-    gLineH = cfg.gforce.visible ? valueBlockSize("0.0", cfg.gforce.size, cfg.gforce).height : 0
   }
 
   private var margin: CGFloat { CGFloat(cfg.margin) / 100 * H }
@@ -425,26 +422,28 @@ private final class OverlayPainter {
     ).integral.size
   }
 
-  private func valueBlockSize(_ text: String, _ sizePct: Double, _ e: ValueCfg) -> CGSize {
-    let f = CGFloat(sizePct / 100) * H
-    let ts = textSize(valueString(text, sizePct, e))
-    let padH = cfg.bgEnabled ? f * BG_PAD_H : 0
-    let padV = cfg.bgEnabled ? f * BG_PAD_V : 0
-    return CGSize(width: ts.width + padH * 2, height: ts.height + padV * 2)
-  }
+  /// A számjegyek magassága a betűméret arányában (ugyanaz, mint
+  /// FONT_METRICS.digitTop a JS oldalon).
+  private var digitTop: CGFloat { cfg.font == "oswald" ? 0.822 : 0.72 }
 
-  /// Egy érték sor kirajzolása (opcionális háttérrel), a megadott helyre téve.
-  /// `rowTop`: a sor teteje (UIKit y). A vízszintes igazítás az anchor szerint.
-  private func valueTile(_ text: String, _ e: ValueCfg, rowTop: CGFloat) -> CIImage? {
+  /// Egy érték sor kirajzolása. A sort a számjegyek dobozához igazítjuk:
+  /// `boxTop` a számjegyek teteje (UIKit y), a doboz alja az alapvonal.
+  /// A vízszintes igazítás az anchor szerint, a margó a beállítás szerinti.
+  private func valueTile(_ text: String, _ e: ValueCfg, boxTop: CGFloat) -> CIImage? {
     let f = CGFloat(e.size / 100) * H
     let str = valueString(text, e.size, e)
     let ts = textSize(str)
+    let font = numberFont(f)
+    let boxH = f * digitTop
     let bg = cfg.bgEnabled
     let padH = bg ? f * BG_PAD_H : 0
     let padV = bg ? f * BG_PAD_V : 0
-    let block = CGSize(width: ts.width + padH * 2, height: ts.height + padV * 2)
-    let sp = ceil(f * 0.35)
-    let canvas = CGSize(width: block.width + sp * 2, height: block.height + sp * 2)
+    let sp = ceil(f * 0.35) + padV
+    // a vászon: a szöveg teljes sordoboza + ráhagyás az árnyéknak/háttérnek
+    let canvas = CGSize(width: ts.width + (padH + sp) * 2, height: ts.height + sp * 2)
+    // a sordoboz teteje a vásznon, és onnan a számjegyek teteje
+    let lineTop = sp
+    let digitsTopInCanvas = lineTop + font.ascender - boxH
     let bgColor = uiColor(cfg.bgColor, CGFloat(cfg.bgOpacity / 100))
 
     let image = renderer(canvas).image { ctx in
@@ -454,25 +453,41 @@ private final class OverlayPainter {
       if bg {
         bgColor.setFill()
         UIBezierPath(
-          roundedRect: CGRect(x: sp, y: sp, width: block.width, height: block.height),
+          roundedRect: CGRect(
+            x: sp, y: digitsTopInCanvas - padV, width: ts.width + padH * 2, height: boxH + padV * 2),
           cornerRadius: f * BG_RADIUS
         ).fill()
       }
       str.draw(
-        with: CGRect(x: sp + padH, y: sp + padV, width: ts.width, height: ts.height),
+        with: CGRect(x: sp + padH, y: lineTop, width: ts.width, height: ts.height),
         options: [.usesLineFragmentOrigin, .usesFontLeading],
         context: nil)
       cg.endTransparencyLayer()
     }
     guard let cgImg = image.cgImage else { return nil }
-    let x = origin(cfg.speed.anchor, block).x
-    return place(CIImage(cgImage: cgImg), uiX: x - sp, uiY: rowTop - sp)
+    let anchor = cfg.speed.anchor
+    let m = margin
+    let x: CGFloat
+    if anchor.hasSuffix("l") {
+      x = m
+    } else if anchor.hasSuffix("r") {
+      x = W - m - ts.width
+    } else {
+      x = (W - ts.width) / 2
+    }
+    return place(
+      CIImage(cgImage: cgImg), uiX: x - sp - padH, uiY: boxTop - digitsTopInCanvas)
   }
 
-  /// A csoport (sebesség + G) teteje
-  private var stackTop: CGFloat {
-    let total = speedLineH + gLineH
-    return cfg.speed.anchor.hasPrefix("b") ? H - margin - total : margin
+  /// A sebesség és a G számjegy-dobozainak teteje (UIKit y)
+  private var valueBoxTops: (speed: CGFloat, g: CGFloat) {
+    let edge = CGFloat(cfg.speed.edge / 100) * H
+    let hS = cfg.speed.visible ? CGFloat(cfg.speed.size / 100) * H * digitTop : 0
+    let hG = cfg.gforce.visible ? CGFloat(cfg.gforce.size / 100) * H * digitTop : 0
+    let gap = (cfg.speed.visible && cfg.gforce.visible)
+      ? CGFloat(cfg.speed.size / 100) * H * VALUE_GAP : 0
+    let top = cfg.speed.anchor.hasPrefix("b") ? H - edge - (hS + gap + hG) : edge
+    return (top, top + hS + gap)
   }
 
   private func speedTile(_ v: Int) -> CIImage? {
@@ -482,7 +497,7 @@ private final class OverlayPainter {
       return c
     }
     lock.unlock()
-    let tile = valueTile("\(v)", cfg.speed, rowTop: stackTop)
+    let tile = valueTile("\(v)", cfg.speed, boxTop: valueBoxTops.speed)
     lock.lock()
     speedCache[v] = tile
     lock.unlock()
@@ -499,7 +514,7 @@ private final class OverlayPainter {
     lock.unlock()
     let v = Double(tenths) / 10
     let text = (v < 0 ? "−" : "") + String(format: "%.1f", abs(v))
-    let tile = valueTile(text, cfg.gforce, rowTop: stackTop + speedLineH)
+    let tile = valueTile(text, cfg.gforce, boxTop: valueBoxTops.g)
     lock.lock()
     gCache[tenths] = tile
     lock.unlock()
