@@ -88,8 +88,6 @@ Ha a Sideloadly azt írja, hogy a Bundle ID foglalt: Sideloadly → *Advanced op
   - **Sebesség / G:** jobb fent, a kép szélénél kicsi, halvány sebesség, alatta
     a G-erő (összes / gyorsítás-fékezés / kanyar). Mértékegység nélkül, de
     bekapcsolható. A valós sebességhez a „Mérés” fülön kapcsold ki a korrekciót.
-    Ha a sebességet el akarod tüntetni a videóról, vágj le egy keskeny sávot a
-    tetejéből (a beállítások kiírják, mennyit – alapból kb. 5%); a G-erő megmarad.
   - **Logó:** alapból kikapcsolva; saját kép a Fotókból, pozíció, méret, felirat.
   - **Effektek:** sebességfüggő elmosás a széleken, dinamikus ráközelítés,
     vignetta, élénk színek. Csak a UI-s videón jelennek meg, és lassítják a feldolgozást.

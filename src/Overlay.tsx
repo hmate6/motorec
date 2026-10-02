@@ -126,8 +126,7 @@ export function Overlay({
 
   // --- Sebesség + alatta G ---
   // A sorok a számjegyek tetejéhez/alapvonalához igazodnak (nem a szövegdobozhoz),
-  // így a csoport a kép széléhez nagyon közel tehető, és a sebesség egy
-  // keskeny sávval levágható úgy, hogy a G-erő megmaradjon.
+  // így a csoport a kép széléhez nagyon közel tehető.
   const sp = c.speed
   const gf = c.gforce
   const metrics = FONT_METRICS[c.font]

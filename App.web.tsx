@@ -23,7 +23,6 @@ import {
   View,
 } from 'react-native'
 import { LOGO, Overlay } from './src/Overlay'
-import { speedCropPct } from './src/overlayConfig'
 import { useSettings } from './src/settings'
 import { SettingsModal } from './src/SettingsModal'
 import { displayedSpeed } from './src/speed'
@@ -37,7 +36,6 @@ export default function WebPreview() {
   const [speed, setSpeed] = useState(87)
   const [lean, setLean] = useState(34)
   const [sim, setSim] = useState(false)
-  const [showCrop, setShowCrop] = useState(true)
   const maxRef = useRef({ l: 0, r: 0 })
 
   // Szimuláció: kanyarok egymás után, hogy látszódjon a folyamatos mozgás
@@ -96,22 +94,6 @@ export default function WebPreview() {
           maxLeft={maxRef.current.l}
           maxRight={maxRef.current.r}
         />
-        {showCrop && s.overlay.speed.anchor[0] === 't' ? (
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              top: 0,
-              height: (speedCropPct(s.overlay).cropPct / 100) * H,
-              borderBottomWidth: 1,
-              borderStyle: 'dashed',
-              borderColor: '#ff4d4d',
-              backgroundColor: 'rgba(255,77,77,0.12)',
-            }}
-          />
-        ) : null}
       </View>
 
       <View style={[styles.controls, { width: W }]}>
@@ -162,17 +144,6 @@ export default function WebPreview() {
           <Pressable style={[styles.button, sim && { backgroundColor: '#444' }]} onPress={() => setSim((v) => !v)}>
             <Text style={styles.buttonText}>{sim ? 'Szimuláció leállítása' : 'Menet szimulálása (mozgás)'}</Text>
           </Pressable>
-          <Pressable
-            style={[styles.button, { backgroundColor: '#2a2d33' }]}
-            onPress={() => setShowCrop((v) => !v)}
-          >
-            <Text style={styles.buttonText}>
-              {showCrop ? 'Vágási sáv elrejtése' : 'Vágási sáv mutatása'}
-            </Text>
-          </Pressable>
-          <Text style={styles.note}>
-            {`A piros sáv: ennyit vágj le a videó tetejéből, hogy a sebesség eltűnjön (${speedCropPct(s.overlay).cropPct.toFixed(1)}%, 1080p-ben ${Math.ceil((speedCropPct(s.overlay).cropPct / 100) * 1080)} px).`}
-          </Text>
           <Pressable
             style={[styles.button, { backgroundColor: '#2a2d33' }]}
             onPress={() => (maxRef.current = { l: 0, r: 0 })}

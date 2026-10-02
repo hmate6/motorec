@@ -60,8 +60,8 @@ export interface SpeedElement extends ValueElement {
   anchor: Anchor
   /**
    * A csoport távolsága a kép szélétől, a kép magasságának %-ában.
-   * A számjegyek tetejétől mérve – így a kép tetejéből egy keskeny sávot
-   * levágva a sebesség eltűnik, az alatta lévő G-erő viszont megmarad.
+   * A számjegyek tetejétől mérve (nem a szövegdoboztól), így a sebesség
+   * egészen közel kerülhet a kép széléhez.
    */
   edge: number
 }
@@ -352,27 +352,6 @@ export const FONT_METRICS: Record<FontChoice, { ascent: number; digitTop: number
 
 /**
  * Rés a sebesség alapvonala és a G-erő számjegyeinek teteje között, a
- * sebesség betűméretének arányában. Ebbe a résbe eshet a vágás vonala.
+ * sebesség betűméretének arányában.
  */
 export const VALUE_GAP = 0.5
-
-/**
- * Mekkora sávot kell levágni a kép tetejéből (a kép magasságának %-ában),
- * hogy a sebesség eltűnjön, de a G-erő megmaradjon. Az árnyék miatt kis
- * ráhagyással. `maxPct`: ennél lejjebb már a G-erő kezdődik.
- */
-export function speedCropPct(c: OverlayConfig): { cropPct: number; maxPct: number } {
-  const sp = c.speed
-  const top = FONT_METRICS[c.font].digitTop
-  const below = Math.max(
-    c.bgEnabled ? sp.size * BG_PAD_V : 0,
-    c.shadow > 0 ? sp.size * SHADOW_RADIUS : 0,
-  )
-  const above = Math.max(
-    c.bgEnabled ? c.gforce.size * BG_PAD_V : 0,
-    c.shadow > 0 ? c.gforce.size * SHADOW_RADIUS : 0,
-  )
-  const speedBottom = sp.edge + sp.size * top
-  const gTop = speedBottom + sp.size * VALUE_GAP
-  return { cropPct: speedBottom + below, maxPct: gTop - above }
-}
